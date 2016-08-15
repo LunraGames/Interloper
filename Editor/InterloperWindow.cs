@@ -24,9 +24,12 @@ namespace LunraGames.Interloper
 			public string TypeName;
 			public string InfoName;
 			public string InfoTypeName;
+			public bool FromAttribute;
 
-			public Entry(object info)
+			public Entry(object info, bool fromAttribute = false)
 			{
+				FromAttribute = fromAttribute;
+
 				if (info is FieldInfo)
 				{
 					var field = info as FieldInfo;
@@ -145,10 +148,18 @@ namespace LunraGames.Interloper
 				var wasEnabled = GUI.enabled;
 				GUI.enabled = !EditorApplication.isPlaying;
 				if (EditingEntry) EntryEditor();
-				else if (GUILayout.Button("Add new..."))
+				else
 				{
-					ResetEditor();
-					EditingEntry = true;
+					GUILayout.BeginHorizontal();
+					{
+						if (GUILayout.Button("Add new..."))
+						{
+							ResetEditor();
+							EditingEntry = true;
+						}
+						if (GUILayout.Button("Add New Attributes")) RefreshAttributeEntries();
+					}
+					GUILayout.EndHorizontal();
 				}
 				GUI.enabled = wasEnabled;
 
@@ -211,7 +222,6 @@ namespace LunraGames.Interloper
 					}
 					EditorGUI.indentLevel--;
 				}
-				EditorGUILayout.EndScrollView();
 
 				if (removedIndex.HasValue)
 				{
@@ -221,6 +231,8 @@ namespace LunraGames.Interloper
 					Settings.EntryRunValues.RemoveAt(removedIndex.Value);
 					Settings.EntryDefaultValues.RemoveAt(removedIndex.Value);
 				}	
+
+				EditorGUILayout.EndScrollView();
 			}
 			catch (Exception e)
 			{
@@ -279,6 +291,23 @@ namespace LunraGames.Interloper
 			else Settings.HasPlayed = false;
 
 			if (IsDirty) Refresh();
+		}
+
+		void RefreshAttributeEntries() 
+		{
+			var attributes = InterloperCacher.Entries;
+			foreach (var attribute in attributes)
+			{
+				var entry = new Entry(attribute.Method, true);
+				if (!Settings.Entries.Any(e => e.TypeName == entry.TypeName && e.InfoTypeName == entry.InfoTypeName))
+				{
+					Settings.Entries.Add(entry);
+					Settings.EntriesShown.Add(true);
+					Settings.EntriesEnabled.Add(false);
+					Settings.EntryRunValues.Add(null);
+					Settings.EntryDefaultValues.Add(null);
+				}
+			}
 		}
 
 		void Refresh()
