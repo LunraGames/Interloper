@@ -13,7 +13,7 @@ namespace LunraGames.Interloper
 		MethodInfo Method { get; }
 	}
 
-	[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
+	[AttributeUsage(AttributeTargets.Method | AttributeTargets.Field)]
 	public class InterloperLinked : Attribute, ILinked, ILinkedMethod
 	{
 		public enum LinkedTypes
