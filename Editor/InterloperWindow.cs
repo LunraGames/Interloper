@@ -238,10 +238,26 @@ namespace LunraGames.Interloper
 			foreach (var result in QueryResults)
 			{
 				var unmodifiedResult = result;
-				if (GUILayout.Button(unmodifiedResult.FullName))
-				{
-					
-				}
+
+				if (unmodifiedResult is MethodEntry) AddEntry((unmodifiedResult as MethodEntry).Method);
+				else if (unmodifiedResult is FieldEntry) AddEntry((unmodifiedResult as MethodEntry).Method);
+				else throw new Exception("Type "+unmodifiedResult.GetType()+" is not recognized");
+			}
+		}
+
+		void DrawQueryResult(MethodEntry entry) 
+		{
+			if (GUILayout.Button(entry.FullName))
+			{
+
+			}
+		}
+
+		void DrawQueryResult(FieldEntry entry) 
+		{
+			if (GUILayout.Button(entry.FullName))
+			{
+
 			}
 		}
 
@@ -299,15 +315,20 @@ namespace LunraGames.Interloper
 				else if (linked is FieldEntry) info = (linked as FieldEntry).Field;
 				else throw new InvalidCastException("Don't recognize type "+(linked.GetType()));
 
-				var entry = new Entry(info, true);
-				if (!Settings.Entries.Any(e => e.TypeName == entry.TypeName && e.InfoTypeName == entry.InfoTypeName))
-				{
-					Settings.Entries.Add(entry);
-					Settings.EntriesShown.Add(true);
-					Settings.EntriesEnabled.Add(false);
-					Settings.EntryRunValues.Add(null);
-					Settings.EntryDefaultValues.Add(null);
-				}
+				AddEntry(info, true);
+			}
+		}
+
+		void AddEntry(object info, bool fromAttribute = false) 
+		{
+			var entry = new Entry(info, fromAttribute);
+			if (!Settings.Entries.Any(e => e.TypeName == entry.TypeName && e.InfoTypeName == entry.InfoTypeName))
+			{
+				Settings.Entries.Add(entry);
+				Settings.EntriesShown.Add(true);
+				Settings.EntriesEnabled.Add(false);
+				Settings.EntryRunValues.Add(null);
+				Settings.EntryDefaultValues.Add(null);
 			}
 		}
 
