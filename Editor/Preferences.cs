@@ -17,6 +17,7 @@ namespace LunraGames.Interloper
 				{
 					"Assembly-CSharp",
 					"Assembly-CSharp-firstpass",
+					"Assembly-CSharp-Editor",
 					"Assembly-CSharp-Editor-firstpass"
 				};
 			}
