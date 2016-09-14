@@ -48,12 +48,14 @@ namespace LunraGames.Interloper
 		}
 
 		[MenuItem ("Window/Lunra Games/Interloper")]
-		static void Init () {
+		static void Init () 
+		{
 			var window = EditorWindow.GetWindow(typeof (InterloperWindow), false, "Interloper") as InterloperWindow;
 			window.Show();
 		}
 
-		void OnGUI () {
+		void OnGUI () 
+		{
 			GUILayout.Label("Snoop on static values, and have them set on runtime. Re-added values may appear incorrect until recompiled or played.", EditorStyles.wordWrappedLabel);
 
 			EditorGUILayout.BeginHorizontal();
@@ -109,8 +111,9 @@ namespace LunraGames.Interloper
 				var changed = false;
 				Query = Deltas.DetectDelta(Query, EditorGUILayout.TextField(Query), ref changed);
 
-				if (changed)
+				if (changed && !string.IsNullOrEmpty(Query))
 				{ 
+					var unmodifiedQuery = Query;
 					var currId = Guid.NewGuid();
 					QueryId = currId;
 					List<INarcissusEntry> results = null;
@@ -118,7 +121,7 @@ namespace LunraGames.Interloper
 
 					Thrifty.Queue(
 						() => {
-							results = Narcissus.Get(Query, Settings.ActiveAssemblies.ToArray()).ToList();
+							results = Narcissus.Get(unmodifiedQuery, Settings.ActiveAssemblies.ToArray()).ToList();
 						},
 						() => {
 							if (currId == QueryId)
@@ -130,7 +133,7 @@ namespace LunraGames.Interloper
 						},
 						Debug.LogException
 					);
-					//
+					Repaint();
 				}
 
 				GUI.enabled = wasEnabled;
@@ -148,7 +151,7 @@ namespace LunraGames.Interloper
 					ResetEntries();
 					ResetEditor();
 				}
-				if (GUILayout.Button("Print stack")) Debug.Log(e.StackTrace);
+				if (GUILayout.Button("Print stack")) Debug.LogException(e);
 				EditorGUILayout.EndHorizontal();
 			}
 		}
@@ -230,19 +233,46 @@ namespace LunraGames.Interloper
 		void DrawQuerying()
 		{
 			GUILayout.Label("Searching...");
+			Settings.QueryScrollPosition = Vector2.zero;
 			Repaint();
 		}
 
 		void DrawQueryResults()
 		{
-			foreach (var result in QueryResults)
+			var maxWidth = position.width;
+			GUILayout.BeginHorizontal();
 			{
-				var unmodifiedResult = result;
-
-				if (unmodifiedResult is MethodEntry) AddEntry((unmodifiedResult as MethodEntry).Method);
-				else if (unmodifiedResult is FieldEntry) AddEntry((unmodifiedResult as MethodEntry).Method);
-				else throw new Exception("Type "+unmodifiedResult.GetType()+" is not recognized");
+				GUILayout.Label("Name", EditorStyles.boldLabel);
+				GUILayout.Label("Type", EditorStyles.boldLabel, GUILayout.Width(32f));
+				GUILayout.Space(20f);
 			}
+			GUILayout.EndHorizontal();
+
+			Settings.QueryScrollPosition = GUILayout.BeginScrollView(new Vector2(0f, Settings.QueryScrollPosition.y), false, true);
+			{
+				foreach (var result in QueryResults)
+				{
+					var unmodifiedResult = result;
+					var isMethod = unmodifiedResult is MethodEntry;
+
+					GUILayout.BeginHorizontal(GUILayout.MaxWidth(maxWidth - 20f));
+					{
+						GUILayout.Label(StringExtensions.TruncateStart(unmodifiedResult.FriendlyName, 40));
+						GUILayout.Label(isMethod ? "M" : "F", GUILayout.Width(12f));
+						if (GUILayout.Button("+", GUILayout.Width(20f)))
+						{
+							if (unmodifiedResult is MethodEntry) AddEntry((unmodifiedResult as MethodEntry).Method);
+							else if (unmodifiedResult is FieldEntry) AddEntry((unmodifiedResult as FieldEntry).Field);
+							else throw new Exception("Type " + unmodifiedResult.GetType() + " is not recognized");
+							Query = null;
+							GUI.FocusControl(null);
+							Repaint();
+						}
+					}
+					GUILayout.EndHorizontal();
+				}
+			}
+			GUILayout.EndScrollView();
 		}
 
 		void DrawQueryResult(MethodEntry entry) 

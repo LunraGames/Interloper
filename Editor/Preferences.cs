@@ -34,5 +34,7 @@ namespace LunraGames.Interloper
 		public List<string> EntryRunValues = new List<string>();
 		public List<string> EntryDefaultValues = new List<string>();
 		public Vector2 ScrollPosition = Vector2.zero;
+
+		public Vector2 QueryScrollPosition = Vector2.zero;
 	}
 }
