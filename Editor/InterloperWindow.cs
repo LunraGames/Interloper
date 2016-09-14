@@ -6,77 +6,13 @@ using System.Reflection;
 using System.Linq;
 using LunraGames;
 using Newtonsoft.Json;
+using LunraGames.Reflection;
 
 namespace LunraGames.Interloper
 {
 	public class InterloperWindow : EditorWindow {
 
-		const string SettingsKey = "LG_Interloper_Settings";
-
-		const string FieldName = "System.MonoField";
-		const string MethodName = "System.MonoMethod";
-
-		[Serializable]
-		class Entry
-		{
-			public string CachedName;
-
-			public string TypeName;
-			public string InfoName;
-			public string InfoTypeName;
-			public bool FromAttribute;
-
-			public Entry(object info, bool fromAttribute = false)
-			{
-				FromAttribute = fromAttribute;
-
-				if (info is FieldInfo)
-				{
-					var field = info as FieldInfo;
-					InfoTypeName = FieldName;
-					CachedName = GetTypeFullName(field.DeclaringType)+"."+field.Name;
-					TypeName = field.DeclaringType.AssemblyQualifiedName;
-					InfoName = field.Name;
-				}
-				else if (info is MethodInfo)
-				{
-					// todo: there's probably a less repetative way to do this...
-					var method = info as MethodInfo;
-					InfoTypeName = MethodName;
-					CachedName = GetTypeFullName(method.DeclaringType)+"."+method.Name;
-					TypeName = method.DeclaringType.AssemblyQualifiedName;
-					InfoName = method.Name;
-				}
-			}
-
-			public object GetInfo()
-			{
-				var declaring = Type.GetType(TypeName);
-				if (InfoTypeName == FieldName || InfoTypeName == typeof(FieldInfo).FullName)
-				{
-					return declaring.GetField(InfoName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
-				}
-				else if (InfoTypeName == MethodName || InfoTypeName == typeof(MethodInfo).FullName)
-				{
-					return declaring.GetMethod(InfoName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
-				}
-				return null;
-			}
-		}
-
-		[Serializable]
-		class Config
-		{
-			public bool HasPlayed;
-			public List<Entry> Entries = new List<Entry>();
-			public List<bool> EntriesShown = new List<bool>();
-			public List<bool> EntriesEnabled = new List<bool>();
-			public List<string> EntryRunValues = new List<string>();
-			public List<string> EntryDefaultValues = new List<string>();
-			public Vector2 ScrollPosition = Vector2.zero;
-		}
-
-		static Type[] SupportedReflectedTypes = new Type[]
+		static Type[] SupportedReflectedTypes =
 		{
 			typeof(FieldInfo),
 			typeof(MethodInfo)
@@ -96,39 +32,44 @@ namespace LunraGames.Interloper
 		object[] Infos;
 		List<string> InfoNames;
 		int SelectedInfo;
+		string Query = string.Empty;
+		List<INarcissusEntry> QueryResults;
+		Guid QueryId;
+		bool Querying;
 
 		[SerializeField]
-		Config Settings;
+		Preferences Settings;
 	
 		InterloperWindow()
 		{
-			Settings = JsonConvert.DeserializeObject<Config>(EditorPrefs.GetString (SettingsKey, JsonConvert.SerializeObject(new Config())));
+			Settings = JsonConvert.DeserializeObject<Preferences>(EditorPrefs.GetString (Strings.SettingsKey, JsonConvert.SerializeObject(new Preferences())));
 			if (!EditorApplication.isPlayingOrWillChangePlaymode) InterloperWindow.IsDirty = true;
 			EditorApplication.update += InterloperUpdate;
 		}
 
 		[MenuItem ("Window/Lunra Games/Interloper")]
-		static void Init () {
+		static void Init () 
+		{
 			var window = EditorWindow.GetWindow(typeof (InterloperWindow), false, "Interloper") as InterloperWindow;
 			window.Show();
 		}
 
-		void OnGUI () {
+		void OnGUI () 
+		{
 			GUILayout.Label("Snoop on static values, and have them set on runtime. Re-added values may appear incorrect until recompiled or played.", EditorStyles.wordWrappedLabel);
 
 			EditorGUILayout.BeginHorizontal();
 			if (GUILayout.Button("Copy Config")) 
 			{
-				EditorGUIUtility.systemCopyBuffer = JsonConvert.SerializeObject(Settings.Entries, Formatting.Indented);
+				EditorGUIUtility.systemCopyBuffer = Serialization.SerializeJson(Settings);
 				ShowNotification(new GUIContent("Copied config to clipboard!"));
 			}
 			if (GUILayout.Button("Paste Config"))
 			{
 				try
 				{
-					var result = JsonConvert.DeserializeObject<List<Entry>>(EditorGUIUtility.systemCopyBuffer);
+					var result = Serialization.DeserializeJson<Preferences>(EditorGUIUtility.systemCopyBuffer);
 					if (result == null) ShowNotification(new GUIContent("Can't paste a null config!"));
-					else if (result.Count == 0) ShowNotification(new GUIContent("Can't paste an empty config!"));
 					{
 						ResetEditor();
 						ResetEntries(result);
@@ -139,6 +80,11 @@ namespace LunraGames.Interloper
 				{
 					UnityEditor.EditorUtility.DisplayDialog("Failed to paste config!", "Encountered exception:\n"+e.Message, "Okay");
 				}
+			}
+			if (GUILayout.Button("Reset")) 
+			{
+				ResetEntries();
+				ResetEditor();
 			}
 			EditorGUILayout.EndHorizontal();
 
@@ -161,78 +107,40 @@ namespace LunraGames.Interloper
 					}
 					GUILayout.EndHorizontal();
 				}
-				GUI.enabled = wasEnabled;
 
-				Settings.ScrollPosition = EditorGUILayout.BeginScrollView(Settings.ScrollPosition);
-				int? removedIndex = null;
-				for (var i = 0; i < Settings.Entries.Count; i++)
-				{
-					var entry = Settings.Entries[i];
-					var shown = Settings.EntriesShown[i];
-					EditorGUILayout.BeginHorizontal();
-					var wasFoldoutColor = GUI.contentColor;
-					GUI.contentColor = (!Settings.EntriesEnabled[i] || Settings.EntryRunValues[i] == Settings.EntryDefaultValues[i]) ? Color.white : Color.yellow;
-					Settings.EntriesShown[i] = EditorGUILayout.Foldout(shown, entry.CachedName);
-					GUI.contentColor = wasFoldoutColor;
-					if (GUILayout.Button("X", GUILayout.ExpandWidth(false))) removedIndex = i;
-					EditorGUILayout.EndHorizontal();
-					if (!shown) continue;
-					EditorGUI.indentLevel++;
-					{
-						var info = entry.GetInfo();
-						if (info == null) EditorGUILayout.HelpBox("Can't resolve "+entry.InfoName+" to a reflected type, make sure it still exists!", MessageType.Error);
-						else if (entry.InfoTypeName == FieldName)
-						{
-							EditorGUILayout.BeginHorizontal();
-							{
-								GUILayout.Space(20f);
-								var wasColor = GUI.contentColor;
-								GUI.contentColor = Settings.EntriesEnabled[i] ? Color.green : Color.red;
-								if (GUILayout.Button(Settings.EntriesEnabled[i] ? "Enabled" : "Disabled")) Settings.EntriesEnabled[i] = !Settings.EntriesEnabled[i];
-								GUI.contentColor = wasColor;
-							}
-							EditorGUILayout.EndHorizontal();
+				var changed = false;
+				Query = Deltas.DetectDelta(Query, EditorGUILayout.TextField(Query), ref changed);
 
-							var field = info as FieldInfo;
-							if (field.FieldType == typeof(bool)) Settings.EntryRunValues[i] = EntryToggle(Settings.EntriesEnabled[i], field, Settings.EntryDefaultValues[i], Settings.EntryRunValues[i]);
-							else if (field.FieldType == typeof(string)) Settings.EntryRunValues[i] = EntryText(Settings.EntriesEnabled[i], field, Settings.EntryDefaultValues[i], Settings.EntryRunValues[i]);
-							else if (field.FieldType == typeof(int)) Settings.EntryRunValues[i] = EntryInt(Settings.EntriesEnabled[i], field, Settings.EntryDefaultValues[i], Settings.EntryRunValues[i]);
-							else EditorGUILayout.HelpBox("Fields of type "+field.FieldType.FullName+" are not currently supported.", MessageType.Warning);
-						}
-						else if (entry.InfoTypeName == MethodName)
-						{
-							EditorGUILayout.BeginHorizontal();
+				if (changed && !string.IsNullOrEmpty(Query))
+				{ 
+					var unmodifiedQuery = Query;
+					var currId = Guid.NewGuid();
+					QueryId = currId;
+					List<INarcissusEntry> results = null;
+					Querying = true;
+
+					Thrifty.Queue(
+						() => {
+							results = Narcissus.Get(unmodifiedQuery, Settings.ActiveAssemblies.ToArray()).ToList();
+						},
+						() => {
+							if (currId == QueryId)
 							{
-								GUILayout.Space(20f);
-								var method = info as MethodInfo;
-								if (GUILayout.Button("Invoke")) 
-								{
-									try
-									{
-										method.Invoke(null, null);
-									}
-									catch (Exception e)
-									{
-										Debug.LogException(e);
-									}
-								}
+								QueryResults = results;
+								Repaint();
+								Querying = false;
 							}
-							EditorGUILayout.EndHorizontal();
-						}
-					}
-					EditorGUI.indentLevel--;
+						},
+						Debug.LogException
+					);
+					Repaint();
 				}
 
-				if (removedIndex.HasValue)
-				{
-					Settings.Entries.RemoveAt(removedIndex.Value);
-					Settings.EntriesShown.RemoveAt(removedIndex.Value);
-					Settings.EntriesEnabled.RemoveAt(removedIndex.Value);
-					Settings.EntryRunValues.RemoveAt(removedIndex.Value);
-					Settings.EntryDefaultValues.RemoveAt(removedIndex.Value);
-				}	
+				GUI.enabled = wasEnabled;
 
-				EditorGUILayout.EndScrollView();
+				if (string.IsNullOrEmpty(Query)) DrawEntries();
+				else if (Querying) DrawQuerying();
+				else if (QueryResults != null) DrawQueryResults();
 			}
 			catch (Exception e)
 			{
@@ -243,8 +151,143 @@ namespace LunraGames.Interloper
 					ResetEntries();
 					ResetEditor();
 				}
-				if (GUILayout.Button("Print stack")) Debug.Log(e.StackTrace);
+				if (GUILayout.Button("Print stack")) Debug.LogException(e);
 				EditorGUILayout.EndHorizontal();
+			}
+		}
+
+		void DrawEntries()
+		{
+			Settings.ScrollPosition = EditorGUILayout.BeginScrollView(Settings.ScrollPosition);
+			int? removedIndex = null;
+			for (var i = 0; i < Settings.Entries.Count; i++)
+			{
+				var entry = Settings.Entries[i];
+				var shown = Settings.EntriesShown[i];
+				EditorGUILayout.BeginHorizontal();
+				var wasFoldoutColor = GUI.contentColor;
+				GUI.contentColor = (!Settings.EntriesEnabled[i] || Settings.EntryRunValues[i] == Settings.EntryDefaultValues[i]) ? Color.white : Color.yellow;
+				Settings.EntriesShown[i] = EditorGUILayout.Foldout(shown, entry.CachedName);
+				GUI.contentColor = wasFoldoutColor;
+				if (GUILayout.Button("X", GUILayout.ExpandWidth(false))) removedIndex = i;
+				EditorGUILayout.EndHorizontal();
+				if (!shown) continue;
+				EditorGUI.indentLevel++;
+				{
+					var info = entry.GetInfo();
+					if (info == null) EditorGUILayout.HelpBox("Can't resolve "+entry.InfoName+" to a reflected type, make sure it still exists!", MessageType.Error);
+					else if (entry.InfoTypeName == Strings.FieldName)
+					{
+						EditorGUILayout.BeginHorizontal();
+						{
+							GUILayout.Space(20f);
+							var wasColor = GUI.contentColor;
+							GUI.contentColor = Settings.EntriesEnabled[i] ? Color.green : Color.red;
+							if (GUILayout.Button(Settings.EntriesEnabled[i] ? "Enabled" : "Disabled")) Settings.EntriesEnabled[i] = !Settings.EntriesEnabled[i];
+							GUI.contentColor = wasColor;
+						}
+						EditorGUILayout.EndHorizontal();
+
+						var field = info as FieldInfo;
+						if (field.FieldType == typeof(bool)) Settings.EntryRunValues[i] = EntryToggle(Settings.EntriesEnabled[i], field, Settings.EntryDefaultValues[i], Settings.EntryRunValues[i]);
+						else if (field.FieldType == typeof(string)) Settings.EntryRunValues[i] = EntryText(Settings.EntriesEnabled[i], field, Settings.EntryDefaultValues[i], Settings.EntryRunValues[i]);
+						else if (field.FieldType == typeof(int)) Settings.EntryRunValues[i] = EntryInt(Settings.EntriesEnabled[i], field, Settings.EntryDefaultValues[i], Settings.EntryRunValues[i]);
+						else EditorGUILayout.HelpBox("Fields of type "+field.FieldType.FullName+" are not currently supported.", MessageType.Warning);
+					}
+					else if (entry.InfoTypeName == Strings.MethodName)
+					{
+						EditorGUILayout.BeginHorizontal();
+						{
+							GUILayout.Space(20f);
+							var method = info as MethodInfo;
+							if (GUILayout.Button("Invoke")) 
+							{
+								try
+								{
+									method.Invoke(null, null);
+								}
+								catch (Exception e)
+								{
+									Debug.LogException(e);
+								}
+							}
+						}
+						EditorGUILayout.EndHorizontal();
+					}
+				}
+				EditorGUI.indentLevel--;
+			}
+
+			if (removedIndex.HasValue)
+			{
+				Settings.Entries.RemoveAt(removedIndex.Value);
+				Settings.EntriesShown.RemoveAt(removedIndex.Value);
+				Settings.EntriesEnabled.RemoveAt(removedIndex.Value);
+				Settings.EntryRunValues.RemoveAt(removedIndex.Value);
+				Settings.EntryDefaultValues.RemoveAt(removedIndex.Value);
+			}	
+
+			EditorGUILayout.EndScrollView();
+		}
+
+		void DrawQuerying()
+		{
+			GUILayout.Label("Searching...");
+			Settings.QueryScrollPosition = Vector2.zero;
+			Repaint();
+		}
+
+		void DrawQueryResults()
+		{
+			var maxWidth = position.width;
+			GUILayout.BeginHorizontal();
+			{
+				GUILayout.Label("Name", EditorStyles.boldLabel);
+				GUILayout.Label("Type", EditorStyles.boldLabel, GUILayout.Width(32f));
+				GUILayout.Space(20f);
+			}
+			GUILayout.EndHorizontal();
+
+			Settings.QueryScrollPosition = GUILayout.BeginScrollView(new Vector2(0f, Settings.QueryScrollPosition.y), false, true);
+			{
+				foreach (var result in QueryResults)
+				{
+					var unmodifiedResult = result;
+					var isMethod = unmodifiedResult is MethodEntry;
+
+					GUILayout.BeginHorizontal(GUILayout.MaxWidth(maxWidth - 20f));
+					{
+						GUILayout.Label(StringExtensions.TruncateStart(unmodifiedResult.FriendlyName, 40));
+						GUILayout.Label(isMethod ? "M" : "F", GUILayout.Width(12f));
+						if (GUILayout.Button("+", GUILayout.Width(20f)))
+						{
+							if (unmodifiedResult is MethodEntry) AddEntry((unmodifiedResult as MethodEntry).Method);
+							else if (unmodifiedResult is FieldEntry) AddEntry((unmodifiedResult as FieldEntry).Field);
+							else throw new Exception("Type " + unmodifiedResult.GetType() + " is not recognized");
+							Query = null;
+							GUI.FocusControl(null);
+							Repaint();
+						}
+					}
+					GUILayout.EndHorizontal();
+				}
+			}
+			GUILayout.EndScrollView();
+		}
+
+		void DrawQueryResult(MethodEntry entry) 
+		{
+			if (GUILayout.Button(entry.FullName))
+			{
+
+			}
+		}
+
+		void DrawQueryResult(FieldEntry entry) 
+		{
+			if (GUILayout.Button(entry.FullName))
+			{
+
 			}
 		}
 
@@ -264,7 +307,7 @@ namespace LunraGames.Interloper
 
 						var entry = Settings.Entries[i];
 						var info = entry.GetInfo();
-						if (entry.InfoTypeName == FieldName)
+						if (entry.InfoTypeName == Strings.FieldName)
 						{
 							var field = info as FieldInfo;
 							if (field.FieldType == typeof(bool)) 
@@ -295,18 +338,27 @@ namespace LunraGames.Interloper
 
 		void RefreshAttributeEntries() 
 		{
-			var attributes = InterloperCacher.Entries;
-			foreach (var attribute in attributes)
+			foreach (var linked in Narcissus.Get<InterloperLinked>(string.Empty, Preferences.DefaultAssemblies.ToArray()))
 			{
-				var entry = new Entry(attribute.Method, true);
-				if (!Settings.Entries.Any(e => e.TypeName == entry.TypeName && e.InfoTypeName == entry.InfoTypeName))
-				{
-					Settings.Entries.Add(entry);
-					Settings.EntriesShown.Add(true);
-					Settings.EntriesEnabled.Add(false);
-					Settings.EntryRunValues.Add(null);
-					Settings.EntryDefaultValues.Add(null);
-				}
+				object info = null;
+				if (linked is MethodEntry) info = (linked as MethodEntry).Method;
+				else if (linked is FieldEntry) info = (linked as FieldEntry).Field;
+				else throw new InvalidCastException("Don't recognize type "+(linked.GetType()));
+
+				AddEntry(info, true);
+			}
+		}
+
+		void AddEntry(object info, bool fromAttribute = false) 
+		{
+			var entry = new Entry(info, fromAttribute);
+			if (!Settings.Entries.Any(e => e.TypeName == entry.TypeName && e.InfoTypeName == entry.InfoTypeName))
+			{
+				Settings.Entries.Add(entry);
+				Settings.EntriesShown.Add(true);
+				Settings.EntriesEnabled.Add(false);
+				Settings.EntryRunValues.Add(null);
+				Settings.EntryDefaultValues.Add(null);
 			}
 		}
 
@@ -318,7 +370,7 @@ namespace LunraGames.Interloper
 			{
 				var entry = Settings.Entries[i];
 				var info = entry.GetInfo();
-				if (entry.InfoTypeName == FieldName)
+				if (entry.InfoTypeName == Strings.FieldName)
 				{
 					var field = info as FieldInfo;
 					var fieldValue = field == null ? null : field.GetValue(null);
@@ -486,8 +538,9 @@ namespace LunraGames.Interloper
 			SelectedInfo = 0;
 		}
 
-		void ResetEntries(List<Entry> replacement = null)
+		void ResetEntries(Preferences replacement = null)
 		{
+			Settings.ActiveAssemblies = Preferences.DefaultAssemblies;
 			Settings.Entries = new List<Entry>();
 			Settings.EntriesShown = new List<bool>();
 			Settings.EntriesEnabled = new List<bool>();
@@ -496,7 +549,7 @@ namespace LunraGames.Interloper
 
 			if (replacement != null)
 			{
-				Settings.Entries = replacement;
+				Settings.Entries = replacement.Entries;
 #pragma warning disable 168
 				foreach (var entry in Settings.Entries)
 #pragma warning restore 168
@@ -506,6 +559,8 @@ namespace LunraGames.Interloper
 					Settings.EntryRunValues.Add(string.Empty);
 					Settings.EntryDefaultValues.Add(string.Empty);
 				}
+
+				Settings.ActiveAssemblies = replacement.ActiveAssemblies;
 			}
 		}
 
@@ -525,16 +580,6 @@ namespace LunraGames.Interloper
 		}
 		*/
 
-		static string GetTypeFullName(Type type)
-		{
-			if (type.IsGenericType) 
-			{
-				var name = type.FullName.Split(',')[0];
-				return name.Substring(1 + name.LastIndexOfAny(new char[] {'['}));
-			}
-			else return type.FullName;
-		}
-
 		void OnLostFocus()
 		{
 			SaveSettings();
@@ -542,7 +587,7 @@ namespace LunraGames.Interloper
 
 		void SaveSettings()
 		{
-			EditorPrefs.SetString(SettingsKey, JsonConvert.SerializeObject (Settings));
+			EditorPrefsExtensions.SetJson(Strings.SettingsKey, Settings);
 		}
 	}
 }
