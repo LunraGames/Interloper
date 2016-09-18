@@ -352,7 +352,7 @@ namespace LunraGames.Interloper
 		void AddEntry(object info, bool fromAttribute = false) 
 		{
 			var entry = new Entry(info, fromAttribute);
-			if (!Settings.Entries.Any(e => e.TypeName == entry.TypeName && e.InfoTypeName == entry.InfoTypeName))
+			if (!Settings.Entries.Any(e => e.InfoName == entry.InfoName && e.TypeName == entry.TypeName && e.InfoTypeName == entry.InfoTypeName))
 			{
 				Settings.Entries.Add(entry);
 				Settings.EntriesShown.Add(true);
@@ -569,17 +569,7 @@ namespace LunraGames.Interloper
 			SaveSettings ();
 			EditorApplication.update -= InterloperUpdate;
 		}
-		/*
-		static IEnumerable<MethodInfo> GetAllMethods(Type type)
-		{
-			if (type == null) return new List<MethodInfo>();
-			BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-			var methods = type.GetMethods(flags).ToList();
-
-			return methods.Concat(GetAllMethods(type.BaseType));
-		}
-		*/
-
+		
 		void OnLostFocus()
 		{
 			SaveSettings();
