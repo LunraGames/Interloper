@@ -4,7 +4,6 @@ using UnityEditor;
 using System;
 using System.Reflection;
 using System.Linq;
-using LunraGames;
 using Newtonsoft.Json;
 using LunraGames.Reflection;
 
@@ -43,14 +42,14 @@ namespace LunraGames.Interloper
 		InterloperWindow()
 		{
 			Settings = JsonConvert.DeserializeObject<Preferences>(EditorPrefs.GetString (Strings.SettingsKey, JsonConvert.SerializeObject(new Preferences())));
-			if (!EditorApplication.isPlayingOrWillChangePlaymode) InterloperWindow.IsDirty = true;
+			if (!EditorApplication.isPlayingOrWillChangePlaymode) IsDirty = true;
 			EditorApplication.update += InterloperUpdate;
 		}
 
 		[MenuItem ("Window/Lunra Games/Interloper")]
 		static void Init () 
 		{
-			var window = EditorWindow.GetWindow(typeof (InterloperWindow), false, "Interloper") as InterloperWindow;
+			var window = GetWindow(typeof (InterloperWindow), false, "Interloper") as InterloperWindow;
 			window.Show();
 		}
 
@@ -273,22 +272,6 @@ namespace LunraGames.Interloper
 				}
 			}
 			GUILayout.EndScrollView();
-		}
-
-		void DrawQueryResult(MethodEntry entry) 
-		{
-			if (GUILayout.Button(entry.FullName))
-			{
-
-			}
-		}
-
-		void DrawQueryResult(FieldEntry entry) 
-		{
-			if (GUILayout.Button(entry.FullName))
-			{
-
-			}
 		}
 
 		void InterloperUpdate()
