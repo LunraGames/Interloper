@@ -17,7 +17,8 @@ namespace LunraGames.Interloper
 			typeof(MethodInfo)
 		};
 
-		internal static bool IsDirty;
+		static bool IsDirty;
+		static InterloperWindow Instance;
 
 		bool EditingEntry;
 		Assembly[] BrowsingAssemblies;
@@ -38,19 +39,31 @@ namespace LunraGames.Interloper
 
 		[SerializeField]
 		Preferences Settings;
-	
+
 		InterloperWindow()
 		{
-			Settings = JsonConvert.DeserializeObject<Preferences>(EditorPrefs.GetString (Strings.SettingsKey, JsonConvert.SerializeObject(new Preferences())));
+			Instance = this;
+		}
+
+		[InitializeOnLoadMethod]
+		static void Loaded()
+		{
 			if (!EditorApplication.isPlayingOrWillChangePlaymode) IsDirty = true;
-			EditorApplication.update += InterloperUpdate;
+			if (Instance != null)
+				EditorApplication.update += Instance.InterloperUpdate;
 		}
 
 		[MenuItem ("Window/Lunra Games/Interloper")]
 		static void Init () 
 		{
-			var window = GetWindow(typeof (InterloperWindow), false, "Interloper") as InterloperWindow;
-			window.Show();
+			Instance = GetWindow(typeof (InterloperWindow), false, "Interloper") as InterloperWindow;
+			Instance.Show();
+			Loaded();
+		}
+
+		void OnEnable()
+		{
+			Instance.Settings = JsonConvert.DeserializeObject<Preferences>(EditorPrefs.GetString(Strings.SettingsKey, JsonConvert.SerializeObject(new Preferences())));
 		}
 
 		void OnGUI () 
