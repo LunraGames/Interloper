@@ -90,7 +90,7 @@ namespace LunraGames.Interloper
 				}
 				catch (Exception e)
 				{
-					UnityEditor.EditorUtility.DisplayDialog("Failed to paste config!", "Encountered exception:\n"+e.Message, "Okay");
+					EditorUtility.DisplayDialog("Failed to paste config!", "Encountered exception:\n"+e.Message, LunraGames.Strings.Dialogs.Responses.Okay);
 				}
 			}
 			if (GUILayout.Button("Reset")) 
@@ -293,7 +293,7 @@ namespace LunraGames.Interloper
 			{
 				if (!Settings.HasPlayed)
 				{
-					var gameWindow = EditorUtility.GetGameWindow();
+					var gameWindow = EditorUtilityExtensions.GetGameWindow();
 					var modificationsMade = false;
 					Settings.HasPlayed = true;
 					for (var i = 0; i < Settings.Entries.Count; i++)

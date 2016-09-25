@@ -39,11 +39,13 @@ namespace LunraGames.Interloper
 		public object GetInfo()
 		{
 			var declaring = Type.GetType(TypeName);
+
 			if (InfoTypeName == Strings.FieldName || InfoTypeName == typeof(FieldInfo).FullName)
 			{
 				return declaring.GetField(InfoName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
 			}
-			else if (InfoTypeName == Strings.MethodName || InfoTypeName == typeof(MethodInfo).FullName)
+
+			if (InfoTypeName == Strings.MethodName || InfoTypeName == typeof(MethodInfo).FullName)
 			{
 				return declaring.GetMethod(InfoName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static);
 			}
