@@ -38,7 +38,7 @@ namespace LunraGames.Interloper
 		bool Querying;
 
 		[SerializeField]
-		Preferences Settings;
+		Preferences Settings = new Preferences();
 
 		InterloperWindow()
 		{
