@@ -4,7 +4,6 @@ using UnityEditor;
 using System;
 using System.Reflection;
 using System.Linq;
-using Newtonsoft.Json;
 using LunraGames.Reflection;
 
 namespace LunraGames.Interloper
@@ -49,8 +48,7 @@ namespace LunraGames.Interloper
 		static void Loaded()
 		{
 			if (!EditorApplication.isPlayingOrWillChangePlaymode) IsDirty = true;
-			if (Instance != null)
-				EditorApplication.update += Instance.InterloperUpdate;
+			if (Instance != null) EditorApplication.update += Instance.InterloperUpdate;
 		}
 
 		[MenuItem ("Window/Lunra Games/Interloper")]
@@ -63,7 +61,7 @@ namespace LunraGames.Interloper
 
 		void OnEnable()
 		{
-			Instance.Settings = JsonConvert.DeserializeObject<Preferences>(EditorPrefs.GetString(Strings.SettingsKey, JsonConvert.SerializeObject(new Preferences())));
+			Instance.Settings = EditorPrefsExtensions.GetJson(Strings.SettingsKey, new Preferences());
 		}
 
 		void OnGUI () 
