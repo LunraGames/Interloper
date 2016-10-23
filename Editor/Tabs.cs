@@ -1,4 +1,4 @@
-﻿namespace LunraGames.Interloper
+﻿namespace LunraGamesEditor.Interloper
 {
 	public enum Tabs
 	{

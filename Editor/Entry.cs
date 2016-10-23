@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Reflection;
 
-namespace LunraGames.Interloper
+namespace LunraGamesEditor.Interloper
 {
 	[Serializable]
 	public class Entry

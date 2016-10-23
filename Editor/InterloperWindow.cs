@@ -4,9 +4,11 @@ using UnityEditor;
 using System;
 using System.Reflection;
 using System.Linq;
+using LunraGames;
 using LunraGames.Reflection;
+using LunraGames.Interloper;
 
-namespace LunraGames.Interloper
+namespace LunraGamesEditor.Interloper
 {
 	public class InterloperWindow : EditorWindow {
 
@@ -88,7 +90,7 @@ namespace LunraGames.Interloper
 				}
 				catch (Exception e)
 				{
-					EditorUtility.DisplayDialog("Failed to paste config!", "Encountered exception:\n"+e.Message, LunraGames.Strings.Dialogs.Responses.Okay);
+					EditorUtility.DisplayDialog("Failed to paste config!", "Encountered exception:\n"+e.Message, Strings.Dialogs.Responses.Okay);
 				}
 			}
 			if (GUILayout.Button("Reset")) 

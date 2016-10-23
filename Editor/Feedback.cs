@@ -1,13 +1,14 @@
 ﻿using UnityEditor;
+using LunraGames.Interloper;
 
-namespace LunraGames.Interloper
+namespace LunraGamesEditor.Interloper
 {
 	public static class Feedback
 	{
-		[MenuItem(LunraGames.Strings.Feedback+Strings.Plugin)]
+		[MenuItem(Strings.Feedback+Strings.Plugin)]
 		static void LaunchFeedback()
 		{
-			PlugIt.Helper.LaunchFeedback(LunraGames.Strings.Company, Strings.Plugin);
+			PlugIt.Helper.LaunchFeedback(LunraGamesEditor.Strings.Company, Strings.Plugin);
 		}
 	}
 }

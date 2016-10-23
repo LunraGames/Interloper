@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace LunraGames.Interloper
+namespace LunraGamesEditor.Interloper
 {
-	public class Strings : LunraGames.Strings
+	public class Strings : LunraGamesEditor.Strings
 	{
 		public const string Plugin = "Interloper";
 		public const string SettingsKey = "LG_Interloper_Settings";

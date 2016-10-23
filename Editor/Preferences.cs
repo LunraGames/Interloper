@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace LunraGames.Interloper
+namespace LunraGamesEditor.Interloper
 {
 	[Serializable]
 	public class Preferences
